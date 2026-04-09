@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>この かずに しよう！ 編集エディタ v4.3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --sidebar-bg: #ffffff;
+            --grid-bg: #e2e8f0;
+            --cell-passable: #ffffff;
+            --cell-blocked: #475569;
+            --wall-color: #ef4444;
+            --accent: #3b82f6;
+        }
+
+        /* 画面全体のスクロールを禁止し、高さを100%に固定 */
+        html, body { 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: sans-serif;
+            background-color: var(--bg-main);
+            color: #1e293b;
+        }
+
+        /* ヘッダーを固定高さにし、縮まないように設定 */
+        header {
+            height: 3.5rem;
+            flex-shrink: 0;
+            z-index: 40;
+        }
+
+        /* メインエリアを画面の残り高さ一杯に広げる */
+        .main-layout { 
+            display: grid; 
+            grid-template-columns: 260px 1fr 320px; 
+            height: calc(100vh - 3.5rem); /* ヘッダー分を引く */
+            overflow: hidden;
+        }
+
+        /* 各カラムが個別にスクロールするように設定 */
+        .sidebar { 
+            background: var(--sidebar-bg); 
+            border-right: 1px solid #e2e8f0; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100%;
+            overflow: hidden; /* 子要素でスクロールさせる */
+        }
+        .sidebar-right { border-right: none; border-left: 1px solid #e2e8f0; }
+
+        /* リスト部分：ここが個別にスクロールする */
+        .problem-list-container { 
+            flex: 1; 
+            overflow-y: auto; 
+            min-height: 0; 
+            padding-bottom: 2rem;
+        }
+
+        /* 中央キャンバス：盤面が大きくてもここだけでスクロールする */
+        .canvas-area { 
+            background-color: var(--grid-bg); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: auto; 
+            position: relative; 
+            height: 100%;
+        }
+
+        .grid-root { 
+            display: grid; 
+            gap: 8px; 
+            padding: 40px; 
+            position: relative; 
+            background: #cbd5e1; 
+            border-radius: 12px; 
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1); 
+            z-index: 1; 
+        }
+
+        .cell {
+            width: 70px; height: 70px; background: var(--cell-passable); border: 1px solid #94a3b8;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 1.2rem; cursor: pointer; user-select: none;
+        }
+        .cell.blocked { background: var(--cell-blocked); border-color: #334155; color: white; }
+        .cell.blocked::after { content: "×"; opacity: 0.3; }
+
+        .wall-v, .wall-h { position: absolute; background: rgba(0,0,0,0.03); z-index: 10; border-radius: 4px; }
+        .wall-active { background: var(--wall-color) !important; box-shadow: 0 0 4px var(--wall-color); z-index: 20; }
+
+        .problem-item { cursor: grab; border-bottom: 1px solid #f1f5f9; background: white; transition: background 0.2s; }
+        .problem-item:active { cursor: grabbing; }
+        .problem-item.dragging { opacity: 0.4; background: #f1f5f9; }
+        .problem-item.drag-over { border-top: 4px solid var(--accent); }
+        .problem-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
+
+        input[type="number"], input[type="text"] { border: 1px solid #d1d5db; padding: 6px 10px; border-radius: 6px; outline-color: var(--accent); width: 100%; }
+        
+        .op-t-btn { border: 2px solid #e2e8f0; background: white; padding: 8px; border-radius: 8px; font-weight: 900; flex: 1; }
+        .op-t-btn.active { background: var(--accent); color: white; border-color: #2563eb; }
+
+        .tool-btn { border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; font-weight: bold; padding: 10px; border-radius: 8px; flex: 1; }
+        .tool-btn.active { background: #334155; color: white; border-color: #1e293b; }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <header class="bg-white border-b flex items-center justify-between px-6 shadow-sm">
+        <h1 class="font-bold text-slate-700 flex items-center gap-2 text-lg">🧩 Pro Editor <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">v4.3</span></h1>
+        <div class="flex gap-2">
+            <button onclick="importJSON()" class="text-xs bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold transition">読み込み</button>
+            <button onclick="exportJSON()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold shadow-sm transition">JSON保存</button>
+        </div>
+    </header>
+
+    <main class="main-layout">
+        <aside class="sidebar">
+            <div class="p-4 border-b flex-shrink-0">
+                <button onclick="createNewProblem()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-blue-700 transition">＋ 新規作成</button>
+            </div>
+            <div id="problem-list" class="problem-list-container"></div>
+        </aside>
+
+        <section class="canvas-area">
+            <div id="editor-ui" class="relative">
+                <div id="grid-root" class="grid-root"></div>
+            </div>
+        </section>
+
+        <aside class="sidebar sidebar-right">
+            <div class="p-6 overflow-y-auto h-full space-y-6">
+                <button onclick="saveActiveProblem()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black shadow-lg transition-transform active:scale-95">💾 変更を保存</button>
+
+                <section class="space-y-4">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1">基本プロパティ</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">タイトル</label>
+                            <input type="text" id="prop-title">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1">レベル</label>
+                                <input type="number" id="prop-level">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1">サイズ</label>
+                                <select id="prop-size" onchange="resizeGrid()" class="w-full border p-1.5 rounded-md text-sm bg-white">
+                                    <option value="3x3">3 x 3</option>
+                                    <option value="4x4">4 x 4</option>
+                                    <option value="5x5">5 x 5</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[11px] font-bold text-blue-600 mb-1">最初の数</label>
+                                <input type="number" id="prop-initial" class="font-black text-blue-700">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-rose-600 mb-1">目標の数</label>
+                                <input type="number" id="prop-target" class="font-black text-rose-700">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="space-y-4">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1">編集ツール</h3>
+                    <div class="flex gap-2">
+                        <button onclick="setTool('passable')" id="tool-passable" class="tool-btn active">マス種類</button>
+                        <button onclick="setTool('op')" id="tool-op" class="tool-btn">演算子入力</button>
+                    </div>
+                    <div id="op-panel" class="p-4 bg-slate-50 border rounded-xl space-y-4 hidden">
+                        <div class="flex gap-1">
+                            <button onclick="setOpType('+')" class="op-t-btn" id="op-t-+">+</button>
+                            <button onclick="setOpType('-')" class="op-t-btn" id="op-t--">-</button>
+                            <button onclick="setOpType('x')" class="op-t-btn" id="op-t-x">×</button>
+                            <button onclick="setOpType('/')" class="op-t-btn" id="op-t-/">÷</button>
+                        </div>
+                        <input type="number" id="op-value" value="1" class="text-center font-black text-lg py-2">
+                    </div>
+                    <button onclick="toggleOuterWalls()" class="w-full py-3 bg-slate-800 text-white text-[11px] font-bold rounded-xl hover:bg-black transition shadow-sm">
+                        外周の壁を一括 ON / OFF
+                    </button>
+                </section>
+            </div>
+        </aside>
+    </main>
+
+    <input type="file" id="file-input" class="hidden" accept=".json" onchange="handleFile(event)">
+
+    <script>
+        const STORAGE_KEY = 'math_puzzle_data_v4_3';
+        let problems = [], activeIdx = -1, workingCopy = null, currentTool = 'passable', currentOpType = '+';
+        let isMouseDown = false, activeLayer = null, dragMode = null, editedThisDrag = new Set();
+        let dragSrcIndex = null;
+
+        window.onload = () => {
+            const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('math_puzzle_data_v4_2');
+            if (saved) { 
+                problems = JSON.parse(saved); 
+                renumberIds();
+                if (problems.length > 0) selectProblem(0); 
+            } else { createNewProblem(); }
+            updateProblemList();
+            setOpType('+');
+            window.addEventListener('mouseup', () => { isMouseDown = false; activeLayer = null; dragMode = null; editedThisDrag.clear(); });
+        };
+
+        function renumberIds() { problems.forEach((p, i) => { p.id = i + 1; }); }
+
+        function createNewProblem() {
+            problems.push({ id: 0, title: "新しい問題", level: 1, target: 10, initial: 0, grid: Array.from({length:3},()=>Array(3).fill('e')), walls: [] });
+            renumberIds();
+            selectProblem(problems.length - 1);
+        }
+
+        function selectProblem(idx) {
+            activeIdx = idx; 
+            workingCopy = JSON.parse(JSON.stringify(problems[idx]));
+            ['title', 'level', 'initial', 'target'].forEach(k => document.getElementById(`prop-${k}`).value = workingCopy[k]);
+            document.getElementById('prop-size').value = `${workingCopy.grid.length}x${workingCopy.grid[0].length}`;
+            refreshEditorUI(); 
+            updateProblemList();
+        }
+
+        // ドラッグ＆ドロップ並び替え
+        function handleDragStart(e, index) { dragSrcIndex = index; e.target.classList.add('dragging'); }
+        function handleDragOver(e, index) { e.preventDefault(); const items = document.querySelectorAll('.problem-item'); items.forEach(item => item.classList.remove('drag-over')); if (index !== dragSrcIndex) { items[index].classList.add('drag-over'); } return false; }
+        function handleDrop(e, targetIndex) { e.stopPropagation(); if (dragSrcIndex !== targetIndex) { const movedItem = problems.splice(dragSrcIndex, 1)[0]; problems.splice(targetIndex, 0, movedItem); renumberIds(); updateProblemList(); activeIdx = targetIndex; } return false; }
+        function handleDragEnd(e) { document.querySelectorAll('.problem-item').forEach(item => { item.classList.remove('dragging'); item.classList.remove('drag-over'); }); }
+
+        function updateProblemList() {
+            const container = document.getElementById('problem-list');
+            container.innerHTML = '';
+            problems.forEach((p, i) => {
+                const item = document.createElement('div');
+                item.className = `problem-item p-4 ${i === activeIdx ? 'active' : ''}`;
+                item.draggable = true;
+                item.onclick = () => selectProblem(i);
+                item.ondragstart = (e) => handleDragStart(e, i);
+                item.ondragover = (e) => handleDragOver(e, i);
+                item.ondrop = (e) => handleDrop(e, i);
+                item.ondragend = (e) => handleDragEnd(e);
+                item.innerHTML = `<div class="text-xs font-black text-slate-800 flex justify-between"><span>${p.title}</span><span class="text-slate-300">#${p.id}</span></div><div class="text-[10px] text-slate-400 mt-1">Lv.${p.level} | ${p.grid[0].length}x${p.grid.length}</div>`;
+                container.appendChild(item);
+            });
+        }
+
+        function handleCellDown(r, c, el) {
+            isMouseDown = true; activeLayer = 'cell';
+            const current = workingCopy.grid[r][c];
+            if (currentTool === 'passable') dragMode = (current === 'b') ? 'remove' : 'add';
+            else dragMode = (current === 'e' || current === 'b') ? 'add' : 'remove';
+            editCell(r, c);
+        }
+
+        function editCell(r, c) {
+            if (activeLayer !== 'cell') return;
+            const key = `cell-${r}-${c}`; if (editedThisDrag.has(key)) return;
+            editedThisDrag.add(key);
+            if (dragMode === 'add') {
+                if (currentTool === 'passable') workingCopy.grid[r][c] = 'b';
+                else workingCopy.grid[r][c] = currentOpType + document.getElementById('op-value').value;
+            } else { workingCopy.grid[r][c] = 'e'; }
+            refreshEditorUI();
+        }
+
+        function handleWallDown(id) { isMouseDown = true; activeLayer = 'wall'; dragMode = workingCopy.walls.includes(id) ? 'remove' : 'add'; toggleWall(id); }
+        function toggleWall(id) {
+            if (activeLayer !== 'wall') return;
+            const key = `wall-${id}`; if (editedThisDrag.has(key)) return;
+            editedThisDrag.add(key);
+            if (dragMode === 'add') { if (!workingCopy.walls.includes(id)) workingCopy.walls.push(id); }
+            else { const idx = workingCopy.walls.indexOf(id); if (idx !== -1) workingCopy.walls.splice(idx, 1); }
+            refreshEditorUI();
+        }
+
+        function refreshEditorUI() {
+            const root = document.getElementById('grid-root');
+            const rows = workingCopy.grid.length, cols = workingCopy.grid[0].length;
+            root.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
+            root.innerHTML = '';
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const val = workingCopy.grid[r][c];
+                    const div = document.createElement('div');
+                    div.className = `cell ${val === 'b' ? 'blocked' : ''}`;
+                    div.innerHTML = (val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷');
+                    div.onmousedown = (e) => { e.preventDefault(); handleCellDown(r, c, div); };
+                    div.onmouseenter = () => { if (isMouseDown) editCell(r, c); };
+                    root.appendChild(div);
+                }
+            }
+            const container = document.getElementById('editor-ui'), cellSize = 70, gap = 8, pad = 40;
+            container.querySelectorAll('.wall-v, .wall-h').forEach(w => w.remove());
+            const createW = (id, isV, r, c) => {
+                const w = document.createElement('div');
+                w.className = `${isV ? 'wall-v' : 'wall-h'} ${workingCopy.walls.includes(id) ? 'wall-active' : ''}`;
+                if(isV) { w.style.width='16px'; w.style.height='70px'; w.style.left=`${pad+(cellSize+gap)*c-(gap+16)/2+2}px`; w.style.top=`${pad+(cellSize+gap)*r}px`; }
+                else { w.style.width='70px'; w.style.height='16px'; w.style.left=`${pad+(cellSize+gap)*c}px`; w.style.top=`${pad+(cellSize+gap)*r-(gap+16)/2+2}px`; }
+                w.onmousedown = (e) => { e.preventDefault(); handleWallDown(id); };
+                w.onmouseenter = () => { if(isMouseDown) toggleWall(id); };
+                container.appendChild(w);
+            };
+            for (let r = 0; r < rows; r++) for (let c = 0; c <= cols; c++) createW(`${r},${c}-${r+1},${c}`, true, r, c);
+            for (let r = 0; r <= rows; r++) for (let c = 0; c < cols; c++) createW(`${r},${c}-${r},${c+1}`, false, r, c);
+        }
+
+        function toggleOuterWalls() {
+            const rows = workingCopy.grid.length, cols = workingCopy.grid[0].length;
+            let outer = [];
+            for(let r=0; r<rows; r++) { outer.push(`${r},0-${r+1},0`); outer.push(`${r},${cols}-${r+1},${cols}`); }
+            for(let c=0; c<cols; c++) { outer.push(`0,${c}-0,${c+1}`); outer.push(`${rows},${c}-${rows},${c+1}`); }
+            if (outer.every(id => workingCopy.walls.includes(id))) workingCopy.walls = workingCopy.walls.filter(id => !outer.includes(id));
+            else outer.forEach(id => { if(!workingCopy.walls.includes(id)) workingCopy.walls.push(id); });
+            refreshEditorUI();
+        }
+
+        function resizeGrid() {
+            const [r, c] = document.getElementById('prop-size').value.split('x').map(Number);
+            const newG = Array.from({length: r}, () => Array(c).fill("e"));
+            for(let i=0; i<Math.min(r, workingCopy.grid.length); i++) for(let j=0; j<Math.min(c, workingCopy.grid[0].length); j++) newG[i][j] = workingCopy.grid[i][j];
+            workingCopy.grid = newG; workingCopy.walls = []; refreshEditorUI();
+        }
+
+        function saveActiveProblem() {
+            ['title', 'level', 'initial', 'target'].forEach(k => workingCopy[k] = document.getElementById(`prop-${k}`).value);
+            problems[activeIdx] = JSON.parse(JSON.stringify(workingCopy));
+            renumberIds();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(problems));
+            updateProblemList(); alert("保存しました！");
+        }
+
+        function setTool(t) { currentTool = t; document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.id === `tool-${t}`)); document.getElementById('op-panel').classList.toggle('hidden', t !== 'op'); }
+        function setOpType(t) { currentOpType = t; document.querySelectorAll('.op-t-btn').forEach(b => b.classList.toggle('active', b.id === `op-t-${t}`)); }
+
+        function exportJSON() { renumberIds(); const blob = new Blob([JSON.stringify(problems, null, 2)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'math_puzzles.json'; a.click(); }
+        function importJSON() { document.getElementById('file-input').click(); }
+        function handleFile(e) { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (ev) => { problems = JSON.parse(ev.target.result); renumberIds(); selectProblem(0); updateProblemList(); }; reader.readAsText(file); }
+    </script>
+</body>
+</html>
