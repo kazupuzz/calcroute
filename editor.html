@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>この かずに しよう！ 編集エディタ v4.3</title>
+    <title>この かずに しよう！ 編集エディタ v5.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --bg-main: #f8fafc;
@@ -16,103 +18,46 @@
             --accent: #3b82f6;
         }
 
-        /* 画面全体のスクロールを禁止し、高さを100%に固定 */
-        html, body { 
-            height: 100vh; 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: sans-serif;
-            background-color: var(--bg-main);
-            color: #1e293b;
-        }
-
-        /* ヘッダーを固定高さにし、縮まないように設定 */
-        header {
-            height: 3.5rem;
-            flex-shrink: 0;
-            z-index: 40;
-        }
-
-        /* メインエリアを画面の残り高さ一杯に広げる */
-        .main-layout { 
-            display: grid; 
-            grid-template-columns: 260px 1fr 320px; 
-            height: calc(100vh - 3.5rem); /* ヘッダー分を引く */
-            overflow: hidden;
-        }
-
-        /* 各カラムが個別にスクロールするように設定 */
-        .sidebar { 
-            background: var(--sidebar-bg); 
-            border-right: 1px solid #e2e8f0; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100%;
-            overflow: hidden; /* 子要素でスクロールさせる */
-        }
+        html, body { height: 100vh; margin: 0; overflow: hidden; font-family: sans-serif; background-color: var(--bg-main); color: #1e293b; }
+        header { height: 3.5rem; flex-shrink: 0; z-index: 40; }
+        .main-layout { display: grid; grid-template-columns: 260px 1fr 320px; height: calc(100vh - 3.5rem); overflow: hidden; }
+        .sidebar { background: var(--sidebar-bg); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
         .sidebar-right { border-right: none; border-left: 1px solid #e2e8f0; }
-
-        /* リスト部分：ここが個別にスクロールする */
-        .problem-list-container { 
-            flex: 1; 
-            overflow-y: auto; 
-            min-height: 0; 
-            padding-bottom: 2rem;
-        }
-
-        /* 中央キャンバス：盤面が大きくてもここだけでスクロールする */
-        .canvas-area { 
-            background-color: var(--grid-bg); 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            overflow: auto; 
-            position: relative; 
-            height: 100%;
-        }
-
-        .grid-root { 
-            display: grid; 
-            gap: 8px; 
-            padding: 40px; 
-            position: relative; 
-            background: #cbd5e1; 
-            border-radius: 12px; 
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1); 
-            z-index: 1; 
-        }
-
-        .cell {
-            width: 70px; height: 70px; background: var(--cell-passable); border: 1px solid #94a3b8;
-            border-radius: 8px; display: flex; align-items: center; justify-content: center;
-            font-weight: 900; font-size: 1.2rem; cursor: pointer; user-select: none;
-        }
+        .problem-list-container { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 2rem; }
+        .canvas-area { background-color: var(--grid-bg); display: flex; align-items: center; justify-content: center; overflow: auto; position: relative; height: 100%; }
+        
+        .grid-root { display: grid; gap: 8px; padding: 40px; position: relative; background: #cbd5e1; border-radius: 12px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.1); z-index: 1; }
+        .cell { width: 70px; height: 70px; background: var(--cell-passable); border: 1px solid #94a3b8; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; cursor: pointer; user-select: none; position: relative; }
         .cell.blocked { background: var(--cell-blocked); border-color: #334155; color: white; }
         .cell.blocked::after { content: "×"; opacity: 0.3; }
+        
+        /* 修正：スタートマスのスタイル */
+        .cell.is-start { border: 4px solid #3b82f6 !important; background: #dbeafe !important; }
+        .cell.is-start::before { content: "🚩"; position: absolute; top: -10px; left: -10px; font-size: 1.2rem; z-index: 30; }
 
         .wall-v, .wall-h { position: absolute; background: rgba(0,0,0,0.03); z-index: 10; border-radius: 4px; }
         .wall-active { background: var(--wall-color) !important; box-shadow: 0 0 4px var(--wall-color); z-index: 20; }
 
         .problem-item { cursor: grab; border-bottom: 1px solid #f1f5f9; background: white; transition: background 0.2s; }
-        .problem-item:active { cursor: grabbing; }
         .problem-item.dragging { opacity: 0.4; background: #f1f5f9; }
         .problem-item.drag-over { border-top: 4px solid var(--accent); }
         .problem-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
 
         input[type="number"], input[type="text"] { border: 1px solid #d1d5db; padding: 6px 10px; border-radius: 6px; outline-color: var(--accent); width: 100%; }
-        
         .op-t-btn { border: 2px solid #e2e8f0; background: white; padding: 8px; border-radius: 8px; font-weight: 900; flex: 1; }
         .op-t-btn.active { background: var(--accent); color: white; border-color: #2563eb; }
-
         .tool-btn { border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; font-weight: bold; padding: 10px; border-radius: 8px; flex: 1; }
         .tool-btn.active { background: #334155; color: white; border-color: #1e293b; }
+
+        #export-temp-container { position: absolute; left: -9999px; top: -9999px; background: white; }
     </style>
 </head>
 <body class="flex flex-col">
 
     <header class="bg-white border-b flex items-center justify-between px-6 shadow-sm">
-        <h1 class="font-bold text-slate-700 flex items-center gap-2 text-lg">🧩 Pro Editor <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">v4.3</span></h1>
+        <h1 class="font-bold text-slate-700 flex items-center gap-2 text-lg">🧩 Pro Editor <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">v5.0</span></h1>
         <div class="flex gap-2">
+            <button onclick="exportAllImagesZip()" class="text-xs bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition">🖼️ 全画像ZIP出力</button>
             <button onclick="importJSON()" class="text-xs bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold transition">読み込み</button>
             <button onclick="exportJSON()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold shadow-sm transition">JSON保存</button>
         </div>
@@ -135,7 +80,7 @@
         <aside class="sidebar sidebar-right">
             <div class="p-6 overflow-y-auto h-full space-y-6">
                 <button onclick="saveActiveProblem()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black shadow-lg transition-transform active:scale-95">💾 変更を保存</button>
-
+                
                 <section class="space-y-4">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1">基本プロパティ</h3>
                     <div class="space-y-4">
@@ -159,11 +104,11 @@
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-[11px] font-bold text-blue-600 mb-1">最初の数</label>
+                                <label class="block text-[11px] font-bold text-blue-600 mb-1">初期値</label>
                                 <input type="number" id="prop-initial" class="font-black text-blue-700">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-rose-600 mb-1">目標の数</label>
+                                <label class="block text-[11px] font-bold text-rose-600 mb-1">目標値</label>
                                 <input type="number" id="prop-target" class="font-black text-rose-700">
                             </div>
                         </div>
@@ -172,9 +117,10 @@
 
                 <section class="space-y-4">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1">編集ツール</h3>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button onclick="setTool('passable')" id="tool-passable" class="tool-btn active">マス種類</button>
-                        <button onclick="setTool('op')" id="tool-op" class="tool-btn">演算子入力</button>
+                        <button onclick="setTool('op')" id="tool-op" class="tool-btn">演算子</button>
+                        <button onclick="setTool('start')" id="tool-start" class="tool-btn">🚩 スタート</button>
                     </div>
                     <div id="op-panel" class="p-4 bg-slate-50 border rounded-xl space-y-4 hidden">
                         <div class="flex gap-1">
@@ -193,19 +139,21 @@
         </aside>
     </main>
 
+    <div id="export-temp-container"></div>
     <input type="file" id="file-input" class="hidden" accept=".json" onchange="handleFile(event)">
 
     <script>
-        const STORAGE_KEY = 'math_puzzle_data_v4_3';
+        const STORAGE_KEY = 'math_puzzle_data_v5_0';
         let problems = [], activeIdx = -1, workingCopy = null, currentTool = 'passable', currentOpType = '+';
         let isMouseDown = false, activeLayer = null, dragMode = null, editedThisDrag = new Set();
         let dragSrcIndex = null;
 
         window.onload = () => {
-            const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('math_puzzle_data_v4_2');
+            const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) { 
                 problems = JSON.parse(saved); 
-                renumberIds();
+                problems.forEach(p => { if(!p.startPos) p.startPos = {r:0,c:0}; });
+                renumberIds(); 
                 if (problems.length > 0) selectProblem(0); 
             } else { createNewProblem(); }
             updateProblemList();
@@ -216,21 +164,22 @@
         function renumberIds() { problems.forEach((p, i) => { p.id = i + 1; }); }
 
         function createNewProblem() {
-            problems.push({ id: 0, title: "新しい問題", level: 1, target: 10, initial: 0, grid: Array.from({length:3},()=>Array(3).fill('e')), walls: [] });
-            renumberIds();
-            selectProblem(problems.length - 1);
+            problems.push({ 
+                id: 0, title: "新しい問題", level: 1, target: 10, initial: 1, 
+                grid: Array.from({length:3},()=>Array(3).fill('e')), 
+                walls: [],
+                startPos: {r:0, c:0} // 修正：デフォルト値
+            });
+            renumberIds(); selectProblem(problems.length - 1);
         }
 
         function selectProblem(idx) {
-            activeIdx = idx; 
-            workingCopy = JSON.parse(JSON.stringify(problems[idx]));
+            activeIdx = idx; workingCopy = JSON.parse(JSON.stringify(problems[idx]));
             ['title', 'level', 'initial', 'target'].forEach(k => document.getElementById(`prop-${k}`).value = workingCopy[k]);
             document.getElementById('prop-size').value = `${workingCopy.grid.length}x${workingCopy.grid[0].length}`;
-            refreshEditorUI(); 
-            updateProblemList();
+            refreshEditorUI(); updateProblemList();
         }
 
-        // ドラッグ＆ドロップ並び替え
         function handleDragStart(e, index) { dragSrcIndex = index; e.target.classList.add('dragging'); }
         function handleDragOver(e, index) { e.preventDefault(); const items = document.querySelectorAll('.problem-item'); items.forEach(item => item.classList.remove('drag-over')); if (index !== dragSrcIndex) { items[index].classList.add('drag-over'); } return false; }
         function handleDrop(e, targetIndex) { e.stopPropagation(); if (dragSrcIndex !== targetIndex) { const movedItem = problems.splice(dragSrcIndex, 1)[0]; problems.splice(targetIndex, 0, movedItem); renumberIds(); updateProblemList(); activeIdx = targetIndex; } return false; }
@@ -253,16 +202,22 @@
             });
         }
 
+        // --- 編集ロジック ---
         function handleCellDown(r, c, el) {
             isMouseDown = true; activeLayer = 'cell';
             const current = workingCopy.grid[r][c];
+            if (currentTool === 'start') {
+                workingCopy.startPos = { r, c };
+                refreshEditorUI();
+                return;
+            }
             if (currentTool === 'passable') dragMode = (current === 'b') ? 'remove' : 'add';
             else dragMode = (current === 'e' || current === 'b') ? 'add' : 'remove';
             editCell(r, c);
         }
 
         function editCell(r, c) {
-            if (activeLayer !== 'cell') return;
+            if (activeLayer !== 'cell' || currentTool === 'start') return;
             const key = `cell-${r}-${c}`; if (editedThisDrag.has(key)) return;
             editedThisDrag.add(key);
             if (dragMode === 'add') {
@@ -291,7 +246,11 @@
                 for (let c = 0; c < cols; c++) {
                     const val = workingCopy.grid[r][c];
                     const div = document.createElement('div');
-                    div.className = `cell ${val === 'b' ? 'blocked' : ''}`;
+                    
+                    // 修正：スタートマスの強調表示
+                    const isStart = (workingCopy.startPos && workingCopy.startPos.r === r && workingCopy.startPos.c === c);
+                    div.className = `cell ${val === 'b' ? 'blocked' : ''} ${isStart ? 'is-start' : ''}`;
+                    
                     div.innerHTML = (val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷');
                     div.onmousedown = (e) => { e.preventDefault(); handleCellDown(r, c, div); };
                     div.onmouseenter = () => { if (isMouseDown) editCell(r, c); };
@@ -327,14 +286,15 @@
             const [r, c] = document.getElementById('prop-size').value.split('x').map(Number);
             const newG = Array.from({length: r}, () => Array(c).fill("e"));
             for(let i=0; i<Math.min(r, workingCopy.grid.length); i++) for(let j=0; j<Math.min(c, workingCopy.grid[0].length); j++) newG[i][j] = workingCopy.grid[i][j];
-            workingCopy.grid = newG; workingCopy.walls = []; refreshEditorUI();
+            workingCopy.grid = newG; workingCopy.walls = []; 
+            if(workingCopy.startPos.r >= r || workingCopy.startPos.c >= c) workingCopy.startPos = {r:0,c:0};
+            refreshEditorUI();
         }
 
         function saveActiveProblem() {
             ['title', 'level', 'initial', 'target'].forEach(k => workingCopy[k] = document.getElementById(`prop-${k}`).value);
             problems[activeIdx] = JSON.parse(JSON.stringify(workingCopy));
-            renumberIds();
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(problems));
+            renumberIds(); localStorage.setItem(STORAGE_KEY, JSON.stringify(problems));
             updateProblemList(); alert("保存しました！");
         }
 
@@ -343,7 +303,75 @@
 
         function exportJSON() { renumberIds(); const blob = new Blob([JSON.stringify(problems, null, 2)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'math_puzzles.json'; a.click(); }
         function importJSON() { document.getElementById('file-input').click(); }
-        function handleFile(e) { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (ev) => { problems = JSON.parse(ev.target.result); renumberIds(); selectProblem(0); updateProblemList(); }; reader.readAsText(file); }
+        function handleFile(e) { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (ev) => { 
+            problems = JSON.parse(ev.target.result); 
+            problems.forEach(p => { if(!p.startPos) p.startPos = {r:0,c:0}; });
+            renumberIds(); selectProblem(0); updateProblemList(); 
+        }; reader.readAsText(file); }
+
+        // --- ZIP画像書き出し（startPos対応版） ---
+        async function exportAllImagesZip() {
+            if (problems.length === 0) return;
+            const zip = new JSZip();
+            const tempContainer = document.getElementById('export-temp-container');
+            if (!confirm(problems.length + "枚の問題をZIPにまとめて書き出します。")) return;
+            const btn = event.target; btn.innerText = "⏳ 処理中..."; btn.disabled = true;
+            try {
+                for (let i = 0; i < problems.length; i++) {
+                    const prob = problems[i];
+                    tempContainer.innerHTML = `
+                        <div id="capture-box" style="padding: 30px; background: white; width: fit-content; border: 2px solid #e2e8f0; border-radius: 20px;">
+                            <div style="margin-bottom: 20px; border-bottom: 4px solid #3b82f6; padding-bottom: 10px;">
+                                <div style="font-size: 14px; font-weight: bold; color: #64748b;">#${prob.id} (Lv.${prob.level})</div>
+                                <div style="font-size: 24px; font-weight: 900; color: #1e293b;">${prob.title}</div>
+                            </div>
+                            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                                <div style="flex: 1; background: #eff6ff; padding: 10px; border-radius: 12px; border: 2px solid #bfdbfe; text-align: center;">
+                                    <div style="font-size: 10px; font-weight: bold; color: #3b82f6; text-transform: uppercase;">最初</div>
+                                    <div style="font-size: 24px; font-weight: 900; color: #1e40af;">${prob.initial}</div>
+                                </div>
+                                <div style="flex: 1; background: #fff1f2; padding: 10px; border-radius: 12px; border: 2px solid #fecdd3; text-align: center;">
+                                    <div style="font-size: 10px; font-weight: bold; color: #e11d48; text-transform: uppercase;">目標</div>
+                                    <div style="font-size: 24px; font-weight: 900; color: #9f1239;">${prob.target}</div>
+                                </div>
+                            </div>
+                            <div id="temp-grid-wrapper" style="position: relative; background: #cbd5e1; padding: 40px; border-radius: 12px;"></div>
+                        </div>`;
+                    const wrapper = tempContainer.querySelector('#temp-grid-wrapper');
+                    const rows = prob.grid.length, cols = prob.grid[0].length;
+                    const gridRoot = document.createElement('div');
+                    gridRoot.style.display = 'grid'; gridRoot.style.gap = '8px'; gridRoot.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const val = prob.grid[r][c];
+                            const cell = document.createElement('div');
+                            cell.style.width = '70px'; cell.style.height = '70px';
+                            const isS = (prob.startPos && prob.startPos.r === r && prob.startPos.c === c);
+                            cell.style.background = val === 'b' ? '#475569' : (isS ? '#dbeafe' : 'white');
+                            cell.style.border = isS ? '4px solid #3b82f6' : '1px solid #94a3b8';
+                            cell.style.borderRadius = '8px'; cell.style.display = 'flex'; cell.style.alignItems = 'center'; cell.style.justifyContent = 'center';
+                            cell.style.fontWeight = '900'; cell.style.fontSize = '1.2rem';
+                            cell.innerHTML = isS ? prob.initial : ((val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷'));
+                            gridRoot.appendChild(cell);
+                        }
+                    }
+                    wrapper.appendChild(gridRoot);
+                    const cellSize = 70, gap = 8, pad = 40;
+                    for (const id of prob.walls) {
+                        const pts = id.split('-').map(p => p.split(',').map(Number));
+                        const isV = pts[0][1] === pts[1][1]; const r = pts[0][0], c = pts[0][1];
+                        const w = document.createElement('div'); w.style.position = 'absolute'; w.style.background = '#ef4444'; w.style.borderRadius = '4px';
+                        if(isV) { w.style.width='16px'; w.style.height='70px'; w.style.left=`${pad+(cellSize+gap)*c-(gap+16)/2+2}px`; w.style.top=`${pad+(cellSize+gap)*r}px`; }
+                        else { w.style.width='70px'; w.style.height='16px'; w.style.left=`${pad+(cellSize+gap)*c}px`; w.style.top=`${pad+(cellSize+gap)*r-(gap+16)/2+2}px`; }
+                        wrapper.appendChild(w);
+                    }
+                    const canvas = await html2canvas(tempContainer.querySelector('#capture-box'), { scale: 2 });
+                    zip.file(`puzzle_${prob.id.toString().padStart(3, '0')}.png`, canvas.toDataURL("image/png").split(',')[1], {base64: true});
+                }
+                const content = await zip.generateAsync({type: "blob"});
+                const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "math_puzzle_images.zip"; link.click();
+            } catch (err) { alert("エラーが発生しました。"); } finally { tempContainer.innerHTML = ""; btn.innerText = "🖼️ 全画像ZIP出力"; btn.disabled = false; }
+        }
     </script>
 </body>
 </html>

@@ -139,10 +139,18 @@
             font-weight: 900;
             box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
             pointer-events: auto;
+            transition: border-color 0.3s;
         }
 
         .cell.blocked { background: #020617; border: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); }
         .cell.visited { border-color: var(--accent-orange); background: rgba(251, 146, 60, 0.05); }
+        
+        /* 修正箇所：スタート地点の強調 */
+        .cell.start-node {
+            border: 4px solid var(--accent-blue);
+            background: rgba(14, 165, 233, 0.1);
+            box-shadow: inset 0 0 15px rgba(14, 165, 233, 0.3);
+        }
 
         .puck {
             position: fixed;
@@ -169,24 +177,13 @@
             border-color: rgba(255, 255, 255, 0.8);
         }
 
-        .initial-box {
-            width: 80px; height: 80px;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(56, 189, 248, 0.1);
-            border: 3px dashed var(--accent-blue);
-            border-radius: 18px;
-            font-size: 1.8rem; font-weight: 900;
-            color: var(--accent-blue);
-            cursor: grab;
-            pointer-events: auto;
-        }
-
         #connection-svg {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             pointer-events: none;
             z-index: 0;
+            overflow: visible;
         }
 
         .conn-line {
@@ -265,7 +262,6 @@
             <div class="grid gap-4">
                 <button id="btn-score-attack" class="bg-orange-500 hover:bg-orange-600 p-6 rounded-2xl text-2xl font-black shadow-[0_6px_0_#c2410c] active:translate-y-1 active:shadow-none transition-all">スコアアタック</button>
                 <button id="btn-free-mode" class="bg-sky-500 hover:bg-sky-600 p-4 rounded-2xl text-2xl font-black shadow-[0_6px_0_#0369a1] active:translate-y-1 active:shadow-none transition-all">フリーモード</button>
-                
                 <button id="btn-json-load" class="bg-slate-500 hover:bg-slate-600 p-4 rounded-2xl text-xl font-black shadow-[0_6px_0_#334155] active:translate-y-1 active:shadow-none transition-all">
                     JSONファイルを よみこむ
                 </button>
@@ -277,11 +273,9 @@
     <div id="game-screen" class="screen-overlay hidden-screen">
         <div class="game-header">
             <div class="status-card border-t-8 border-rose-500">
-                <p class="text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-tighter">この かずに しよう！</p>
                 <p id="target-display" class="text-2xl font-game font-black text-rose-500">10</p>
             </div>
             <div class="status-card border-t-8 border-sky-400">
-                <p class="text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-tighter">いまの かず</p>
                 <p id="current-display" class="text-2xl font-game font-black text-sky-400">--</p>
             </div>
         </div>
@@ -289,7 +283,6 @@
         <div id="free-panel" class="side-panel">
             <button onclick="backToTitle()" class="btn-ui btn-back">タイトルへ</button>
             <div class="bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
-                <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">もんだい せんたく</p>
                 <select id="problem-selector" onchange="loadLevel(parseInt(this.value))"></select>
             </div>
             <button onclick="nextProblem()" id="next-btn" class="btn-ui btn-next">つぎへ →</button>
@@ -298,11 +291,9 @@
         <div id="score-panel" class="side-panel hidden-screen">
             <button onclick="backToTitle()" class="btn-ui btn-back">タイトルへ</button>
             <div class="bg-white/10 p-4 rounded-2xl border-l-8 border-orange-500">
-                <p class="text-xs font-bold text-slate-400">のこり じかん</p>
                 <p id="timer-display" class="text-xl font-game font-black text-white">3:00</p>
             </div>
             <div class="bg-white/10 p-4 rounded-2xl border-l-8 border-blue-400">
-                <p class="text-xs font-bold text-slate-400">スコア</p>
                 <p id="score-display" class="text-xl font-game font-black text-sky-400">0</p>
             </div>
             <button onclick="nextProblem()" class="btn-ui btn-reset bg-slate-600">スキップ</button>
@@ -314,9 +305,6 @@
                 <div id="game-grid" class="grid-container"></div>
                 <div class="control-group-panel">
                     <button class="btn-ui btn-reset w-full shadow-lg" onclick="resetLevel()">リセット</button>
-                    <div id="initial-area">
-                        <div id="start-node" class="initial-box font-game shadow-2xl">0</div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -324,14 +312,6 @@
 
     <div id="floating-puck" class="puck"></div>
     <div id="clear-overlay"><div class="clear-text">クリア！</div></div>
-
-    <div id="result-modal" class="hidden-screen fixed inset-0 flex items-center justify-center p-4 bg-black/80 interactive" style="z-index: 10001;">
-        <div class="bg-white p-12 rounded-[40px] text-center shadow-2xl max-w-sm w-full">
-            <h2 class="text-4xl font-black text-orange-500 mb-2">しゅうりょう！</h2>
-            <div class="text-8xl font-game font-black text-blue-600 mb-12"><span id="final-score">0</span></div>
-            <button onclick="backToTitle()" class="bg-blue-500 text-white font-black py-5 px-10 rounded-2xl text-2xl w-full active:scale-95 transition-all">タイトルへ</button>
-        </div>
-    </div>
 
     <script>
         class Fraction {
@@ -356,65 +336,43 @@
 
         const GRADE_CONFIG = { 1: [1, 2], 2: [1, 3] };
 
+        // サンプル問題（startPosがない場合は0,0になるよう後述のロジックでケアします）
         const ALL_PROBLEMS = [
-            { id: 1, title: "A-1", level: 1, target: 6, initial: 1, grid: [["+1","b","b"],["+1","+1","+1"],["b","b","+1"]] },
-            { id: 2, title: "A-2", level: 1, target: 6, initial: 1, grid: [["e", "+1", "+1"],["+1", "e", "b"],["b", "+1", "+1"]] },
-            { id: 3, title: "A-3", level: 2, target: 6, initial: 1, grid: [["-1", "+1", "+1"],["+1", "+1", "b"],["+1", "b", "b"]] },
-            { id: 4, title: "A-4", level: 1, target: 6, initial: 1, grid: [["b", "+1", "b"],["+2", "e", "b"],["b", "+3", "b"]] },
-            { id: 5, title: "A-5", level: 1, target: 4, initial: 1, grid: [["b","+2","b"],["b","e","b"],["+1","e","+4"]] },
-            { id: 6, title: "A-6", level: 1, target: 10, initial: 6, grid: [["+1", "b", "+2"], ["e", "e", "e"], ["+3", "b", "+3"]] },
-            { id: 7, title: "A-7", level: 1, target: 0, initial: 10, grid: [["-2","-2","b"],["b","-2","-2"],["-2","-2","b"]] },
-            { id: 8, title: "A-8", level: 2, target: 0, initial: 5, grid: [["e","e","-10"],["e","+1","b"],["+3","e","+2"]] },
-            { id: 9, title: "A-9", level: 2, target: 6, initial: 5, grid: [["b","-3","b"],["b","+2","b"],["+2","+2","+2"]] },
-            { id: 10, title: "A-10", level: 2, target: 8, initial: 1, grid: [["+2", "+3", "+1"],["+2", "b", "+2"],["+2", "+4", "+2"]] },
-            { id: 11, title: "A-11", level: 2, target: 8, initial: 1, grid: [["b", "+3", "b"],["+4", "-2", "+5"],["b", "+2", "b"]] },
-            { id: 12, title: "A-12", level: 2, target: 0, initial: 1, grid: [["+1","+2","+3"],["+1","+2","+3"],["b","-8","b"]] },
-            { id: 13, title: "A-13", level: 2, target: 10, initial: 3, grid: [["b","b","b","b"],["b","+4","e","+1"],["+1","e","+5","b"],["b","b","b","b"]] },
-            { id: 14, title: "A-14", level: 2, target: 10, initial: 3, grid: [["b", "b", "+2", "b"],["e", "+2", "e", "b"],["b", "e", "+2", "+1"],["b", "+1", "b", "b"]] },
-            { id: 15, title: "A-15", level: 2, target: 20, initial: 3, grid: [["b","+1","e","b"],["+4","e","+2","b"],["b","+5","e","+3"],["b","e","+6","b"]] },
-            { id: 16, title: "B-1", level: 3, target: 8, initial: 1, grid: [["b","x2","b"],["x2","e","b"],["e","e","x2"]] },
-            { id: 17, title: "B-2", level: 3, target: 27, initial: 1, grid: [["e","x3","b"],["e","e","e"],["x3","b","x3"]] },
-            { id: 18, title: "B-3", level: 3, target: 4, initial: 1, grid: [["b", "e", "x2"],["x3", "e", "x3"],["x2", "e", "b"]] },
-            { id: 19, title: "B-4", level: 3, target: 10, initial: 1, grid: [["x2", "e", "x3"],["b", "e", "b"],["x4", "e", "x5"]] },
-            { id: 20, title: "B-5", level: 3, target: 12, initial: 1, grid: [["x4", "b", "x3"],["e", "x2", "e"],["e", "e", "e"]] },
-            { id: 21, title: "B-6", level: 3, target: 12, initial: 1, grid: [["x3", "e", "x1"],["b", "x2", "b"],["x2", "e", "x3"]] },
-            { id: 22, title: "B-7", level: 3, target: 100, initial: 10, grid: [["b", "b", "x5", "b"],["b", "b", "e", "b"],["e", "+2", "e", "+4"],["+3", "e", "+3", "e"]] },
-            { id: 23, title: "B-8", level: 3, target: 100, initial: 1, grid: [["b", "e", "x5", "b"],["x3", "x2", "e", "e"],["e", "e", "x2", "x3"],["b", "x5", "e", "b"]] },
-            { id: 24, title: "B-9", level: 3, target: 1, initial: 60, grid: [["/2", "e", "/2", "e"],["e", "b", "b", "/3"],["/3", "b", "b", "e"],["e", "/5", "e", "/3"]] },
-            { id: 25, title: "B-10", level: 3, target: 1, initial: 30, grid: [["b", "e", "-3", "b"],["e", "/6", "e", "e"],["e", "e", "/2", "e"],["b", "e", "e", "b"]] },
-            { id: 26, title: "B-11", level: 3, target: 15, initial: 1, grid: [["b", "b", "x3", "b"],["b", "+1", "e", "b"],["+1", "e", "e", "x2"],["b", "b", "+1", "e"]] },
-            { id: 27, title: "B-12", level: 3, target: 17, initial: 1, grid: [["x3", "e", "+1", "e"],["e", "b", "b", "+1"],["+1", "b", "+1", "e"],["e", "+1", "e", "+1"]] },
-            { 
-                id: 28, title: "B-13", level: 3, target: 12, initial: 1, 
-                grid: [["e", "x2", "e", "b"],["+1", "b", "+1", "b"],["e", "+1", "e", "e"],["b", "e", "x2", "b"]],
-                walls: ["0,1-1,1", "2,1-2,2", "2,2-3,2", "4,1-4,2", "2,0-3,0"] 
-            },
+            { id: 1, title: "A-1", level: 1, target: 6, initial: 1, startPos:{r:0,c:0}, grid: [["e","b","b"],["+1","+1","+1"],["b","b","+1"]] },
+            { id: 2, title: "A-2", level: 1, target: 6, initial: 1, startPos:{r:0,c:1}, grid: [["e", "e", "+1"],["+1", "e", "b"],["b", "+1", "+1"]] },
+            { id: 16, title: "B-1", level: 3, target: 8, initial: 1, startPos:{r:0,c:0}, grid: [["e","x2","b"],["x2","e","b"],["e","e","x2"]] },
         ];
 
         let currentMode = '', currentGrade = 1, currentProblemList = [], currentProblemIndex = 0;
         let score = 0, timeLeft = 180, timerInterval = null;
         let currentVal = new Fraction(0), path = [], isDragging = false, isCleared = false;
 
-        const gridElement = document.getElementById('game-grid'), startNode = document.getElementById('start-node');
+        const gridElement = document.getElementById('game-grid');
         const currentDisplay = document.getElementById('current-display'), targetDisplay = document.getElementById('target-display');
         const floatingPuck = document.getElementById('floating-puck'), svgElement = document.getElementById('connection-svg');
 
         function init() {
             document.getElementById('btn-score-attack').onclick = () => startGame('score');
             document.getElementById('btn-free-mode').onclick = () => startGame('free');
-            
-            // JSON読み込みイベント
             document.getElementById('btn-json-load').onclick = () => document.getElementById('json-input').click();
             document.getElementById('json-input').onchange = handleJsonUpload;
 
-            startNode.addEventListener('mousedown', startDrag);
-            startNode.addEventListener('touchstart', (e) => { e.preventDefault(); startDrag(e); }, {passive: false});
+            // 修正：パック（数字）をクリックした時だけでなく、初期配置マスをクリックした時もドラッグ開始
             floatingPuck.addEventListener('mousedown', startDrag);
             floatingPuck.addEventListener('touchstart', (e) => { e.preventDefault(); startDrag(e); }, {passive: false});
+            
             window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
             window.addEventListener('touchmove', (e) => { if(isDragging) { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); } }, {passive: false});
             window.addEventListener('mouseup', endDrag);
             window.addEventListener('touchend', endDrag);
+        }
+
+        function normalizeWall(id) {
+            if (!id) return "";
+            const pts = id.trim().split('-');
+            if (pts.length !== 2) return id.trim();
+            const sorted = pts.sort();
+            return sorted[0] + "-" + sorted[1];
         }
 
         function handleJsonUpload(e) {
@@ -424,21 +382,17 @@
             reader.onload = (event) => {
                 try {
                     const data = JSON.parse(event.target.result);
-                    if (!Array.isArray(data)) throw new Error();
-                    // 文字列の数値を数値に変換
-                    const formattedProblems = data.map(p => ({
+                    currentProblemList = data.map(p => ({
                         ...p,
                         id: parseInt(p.id),
                         level: parseInt(p.level),
                         target: parseInt(p.target),
                         initial: parseInt(p.initial),
-                        walls: p.walls || []
+                        startPos: p.startPos || {r:0, c:0},
+                        walls: (p.walls || []).map(normalizeWall)
                     }));
-                    currentProblemList = formattedProblems;
                     startGame('json');
-                } catch (err) {
-                    alert('JSONファイルの けいしきが ただしくありません。');
-                }
+                } catch (err) { alert('JSON形式が正しくありません。'); }
             };
             reader.readAsText(file);
         }
@@ -450,91 +404,91 @@
                 currentGrade = 1;
                 for(let r of radios) if(r.checked) currentGrade = parseInt(r.value);
                 const allowedLevels = GRADE_CONFIG[currentGrade] || [1];
-                currentProblemList = ALL_PROBLEMS.filter(p => allowedLevels.includes(p.level));
+                currentProblemList = ALL_PROBLEMS.filter(p => allowedLevels.includes(p.level)).map(p => ({
+                    ...p, walls: (p.walls || []).map(normalizeWall), startPos: p.startPos || {r:0, c:0}
+                }));
             }
-            
             currentProblemIndex = 0; score = 0;
             document.getElementById('start-screen').classList.add('hidden-screen');
             document.getElementById('game-screen').classList.remove('hidden-screen');
-            
-            if(mode === 'score') {
-                timeLeft = 180;
-                document.getElementById('score-panel').classList.remove('hidden-screen');
-                document.getElementById('free-panel').classList.add('hidden-screen');
-                startTimer();
-            } else {
-                document.getElementById('free-panel').classList.remove('hidden-screen');
-                document.getElementById('score-panel').classList.add('hidden-screen');
-                updateProblemSelector();
-            }
+            if(mode === 'score') { timeLeft = 180; document.getElementById('score-panel').classList.remove('hidden-screen'); document.getElementById('free-panel').classList.add('hidden-screen'); startTimer(); }
+            else { document.getElementById('free-panel').classList.remove('hidden-screen'); document.getElementById('score-panel').classList.add('hidden-screen'); updateProblemSelector(); }
             loadLevel(0);
         }
 
-        function backToTitle() { stopTimer(); document.getElementById('start-screen').classList.remove('hidden-screen'); document.getElementById('game-screen').classList.add('hidden-screen'); document.getElementById('result-modal').classList.add('hidden-screen'); floatingPuck.style.display = 'none'; }
+        function backToTitle() { stopTimer(); document.getElementById('start-screen').classList.remove('hidden-screen'); document.getElementById('game-screen').classList.add('hidden-screen'); floatingPuck.style.display = 'none'; }
         
         function updateProblemSelector() {
             const selector = document.getElementById('problem-selector'); selector.innerHTML = '';
             currentProblemList.forEach((p, idx) => {
                 const opt = document.createElement('option'); opt.value = idx;
-                const isSolved = sessionStorage.getItem(`cleared_math_p${p.id}`);
-                opt.innerText = p.title + (isSolved ? " ★" : ""); selector.appendChild(opt);
+                opt.innerText = p.title + (sessionStorage.getItem(`cleared_math_p${p.id}`) ? " ★" : ""); selector.appendChild(opt);
             });
             selector.value = currentProblemIndex;
-            const nextBtn = document.getElementById('next-btn'); nextBtn.disabled = (currentProblemIndex >= currentProblemList.length - 1);
+            document.getElementById('next-btn').disabled = (currentProblemIndex >= currentProblemList.length - 1);
         }
 
-        function startTimer() {
-            if(timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(() => { timeLeft--; const m = Math.floor(timeLeft / 60), s = timeLeft % 60; document.getElementById('timer-display').innerText = `${m}:${s.toString().padStart(2, '0')}`; if(timeLeft <= 0) { stopTimer(); showResult(); } }, 1000);
-        }
-        function stopTimer() { if(timerInterval) clearInterval(timerInterval); timerInterval = null; }
-        function showResult() { document.getElementById('final-score').innerText = score; document.getElementById('result-modal').classList.remove('hidden-screen'); }
+        function startTimer() { timerInterval = setInterval(() => { timeLeft--; const m = Math.floor(timeLeft / 60), s = timeLeft % 60; document.getElementById('timer-display').innerText = `${m}:${s.toString().padStart(2, '0')}`; if(timeLeft <= 0) { stopTimer(); alert('終了！スコア: ' + score); backToTitle(); } }, 1000); }
+        function stopTimer() { clearInterval(timerInterval); }
 
         function loadLevel(idx) {
             currentProblemIndex = idx; const level = currentProblemList[idx]; if (!level) return;
             isCleared = false; isDragging = false; path = []; currentVal = new Fraction(level.initial);
-            targetDisplay.innerText = level.target; startNode.innerText = level.initial;
+            targetDisplay.innerText = level.target;
+
             document.getElementById('clear-overlay').style.display = 'none';
             const rows = level.grid.length, cols = level.grid[0].length;
             gridElement.innerHTML = ''; gridElement.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            
             for(let r=0; r<rows; r++) {
                 for(let c=0; c<cols; c++) {
                     const op = level.grid[r][c], div = document.createElement('div');
                     div.className = 'cell'; div.dataset.r = r; div.dataset.c = c; div.dataset.op = op;
-                    if(op === 'b') div.classList.add('blocked');
-                    else if(op !== 'e') div.innerText = op.replace('x', '×').replace('/', '÷');
+                    
+                    // 修正：スタート地点の表示
+                    if(r === level.startPos.r && c === level.startPos.c) {
+                        div.classList.add('start-node');
+                        div.innerText = level.initial; // スタートマスには数字を表示
+                    } else if(op === 'b') {
+                        div.classList.add('blocked');
+                    } else if(op !== 'e') {
+                        div.innerText = op.replace('x', '×').replace('/', '÷');
+                    }
                     gridElement.appendChild(div);
                 }
             }
             if(currentMode !== 'score') updateProblemSelector();
-            floatingPuck.style.display = 'none';
-            setTimeout(() => { drawConnections(); snapPuckToTarget(startNode); floatingPuck.style.display = 'flex'; updateDisplay(false); }, 50);
+            
+            setTimeout(() => { 
+                drawConnections(); 
+                // スタートマスにパックを移動
+                const startCell = document.querySelector(`.cell[data-r="${level.startPos.r}"][data-c="${level.startPos.c}"]`);
+                snapPuckToTarget(startCell); 
+                floatingPuck.style.display = 'flex'; 
+                updateDisplay(false); 
+            }, 100);
         }
 
         function resetLevel() { loadLevel(currentProblemIndex); }
-        function nextProblem() { if(currentProblemIndex < currentProblemList.length - 1) loadLevel(currentProblemIndex + 1); else if(currentMode === 'score') showResult(); }
+        function nextProblem() { if(currentProblemIndex < currentProblemList.length - 1) loadLevel(currentProblemIndex + 1); else backToTitle(); }
 
         function drawConnections() {
             svgElement.innerHTML = ''; const level = currentProblemList[currentProblemIndex]; if(!level) return;
             const cells = document.querySelectorAll('.cell'); if (cells.length === 0) return;
             const svgRect = svgElement.getBoundingClientRect();
-            const gridRect = gridElement.getBoundingClientRect();
             const firstCell = cells[0].getBoundingClientRect();
             const gap = 18;
-            const rows = level.grid.length, cols = level.grid[0].length;
+            const getX = (c) => (firstCell.left - svgRect.left) + c * (firstCell.width + gap) - gap/2;
+            const getY = (r) => (firstCell.top - svgRect.top) + r * (firstCell.height + gap) - gap/2;
 
-            const getX = (c) => (firstCell.left - gridRect.left) + c * (firstCell.width + gap) - gap/2;
-            const getY = (r) => (firstCell.top - gridRect.top) + r * (firstCell.height + gap) - gap/2;
-
-            const rects = Array.from(cells).map(c => ({ r: parseInt(c.dataset.r), c: parseInt(c.dataset.c), op: c.dataset.op, rect: c.getBoundingClientRect() }));
+            const rects = Array.from(cells).map(c => ({ r: parseInt(c.dataset.r), c: parseInt(c.dataset.c), rect: c.getBoundingClientRect() }));
             rects.forEach(r1 => {
                 rects.forEach(r2 => {
                     const isAdjV = (r1.r + 1 === r2.r && r1.c === r2.c), isAdjH = (r1.r === r2.r && r1.c + 1 === r2.c);
                     if(isAdjV || isAdjH) {
-                        const r_mid = isAdjV ? r2.r : r1.r;
-                        const c_mid = isAdjH ? r2.c : r1.c;
-                        const wallId = isAdjV ? `${r_mid},${c_mid}-${r_mid},${c_mid+1}` : `${r_mid},${c_mid}-${r_mid+1},${c_mid}`;
-                        if (level.walls && (level.walls.includes(wallId) || level.walls.includes(wallId.split('-').reverse().join('-')))) return;
+                        const midR = isAdjV ? r2.r : r1.r, midC = isAdjH ? r2.c : r1.c;
+                        const wallId = normalizeWall(isAdjV ? `${midR},${midC}-${midR},${midC+1}` : `${midR},${midC}-${midR+1},${midC}`);
+                        if (level.walls && level.walls.includes(wallId)) return;
 
                         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                         line.setAttribute("x1", (r1.rect.left + r1.rect.width/2) - svgRect.left);
@@ -549,7 +503,7 @@
 
             if (level.walls) {
                 level.walls.forEach(w => {
-                    const pts = w.split('-').map(p => p.split(',').map(Number));
+                    const pts = normalizeWall(w).split('-').map(p => p.split(',').map(Number));
                     if (pts.length < 2) return;
                     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                     line.setAttribute("x1", getX(pts[0][1])); line.setAttribute("y1", getY(pts[0][0]));
@@ -561,15 +515,16 @@
 
         function isWallBlocked(r1, c1, r2, c2, walls) {
             if (!walls) return false;
-            let wallId = (r1 === r2) ? `${r1},${Math.max(c1, c2)}-${r1+1},${Math.max(c1, c2)}` : `${Math.max(r1, r2)},${c1}-${Math.max(r1, r2)},${c1+1}`;
-            return walls.includes(wallId) || walls.includes(wallId.split('-').reverse().join('-'));
+            r1 = parseInt(r1); c1 = parseInt(c1); r2 = parseInt(r2); c2 = parseInt(c2);
+            let id = (r1 === r2) ? `${r1},${Math.max(c1, c2)}-${r1+1},${Math.max(c1, c2)}` : `${Math.max(r1, r2)},${c1}-${Math.max(r1, r2)},${c1+1}`;
+            return walls.includes(normalizeWall(id));
         }
 
         function updateDisplay(bounce = true) {
             currentDisplay.innerHTML = currentVal.toHTML(); floatingPuck.innerHTML = currentVal.toHTML();
             const level = currentProblemList[currentProblemIndex]; if(!level) return;
             if(currentVal.equals(level.target)) floatingPuck.classList.add('at-target'); else floatingPuck.classList.remove('at-target');
-            startNode.style.opacity = path.length > 0 ? "0.3" : "1";
+            
             document.querySelectorAll('.cell').forEach(c => c.classList.remove('visited'));
             document.querySelectorAll('.conn-line').forEach(l => l.classList.remove('highlight', 'visited'));
             path.forEach((p, i) => {
@@ -582,8 +537,8 @@
             if(!isCleared && path.length > 0 && isDragging) {
                 const last = path[path.length - 1];
                 [{r:last.r-1, c:last.c}, {r:last.r+1, c:last.c}, {r:last.r, c:last.c-1}, {r:last.r, c:last.c+1}].forEach(n => {
-                    const targetCell = document.querySelector(`.cell[data-r="${n.r}"][data-c="${n.c}"]`);
-                    if(!targetCell || targetCell.dataset.op === 'b' || path.some(p => p.r === n.r && p.c === n.c)) return;
+                    const target = document.querySelector(`.cell[data-r="${n.r}"][data-c="${n.c}"]`);
+                    if(!target || target.classList.contains('blocked') || path.some(p => p.r === n.r && p.c === n.c)) return;
                     if(isWallBlocked(last.r, last.c, n.r, n.c, level.walls)) return;
                     const id = `${Math.min(last.r, n.r)},${Math.min(last.c, n.c)}-${Math.max(last.r, n.r)},${Math.max(last.c, n.c)}`;
                     const line = document.querySelector(`.conn-line[data-pair="${id}"]`); if(line) line.classList.add('highlight');
@@ -597,43 +552,47 @@
             floatingPuck.style.pointerEvents = 'none'; const el = document.elementFromPoint(clientX, clientY); floatingPuck.style.pointerEvents = 'auto';
             const cell = el ? el.closest('.cell') : null; if(!cell) return;
             const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c), op = cell.dataset.op; if(op === 'b') return;
-            const level = currentProblemList[currentProblemIndex]; if(!level) return;
-            const rows = level.grid.length, cols = level.grid[0].length;
+            const level = currentProblemList[currentProblemIndex];
 
+            // 修正：盤面内スタート。pathが空の時は、スタート地点のマスに入った時のみ開始
             if(path.length === 0) {
-                if(!(r === 0 || r === rows - 1 || c === 0 || c === cols - 1)) return;
-                let wallId = (r === 0) ? `0,${c}-0,${c+1}` : (r === rows - 1) ? `${rows},${c}-${rows},${c+1}` : (c === 0) ? `${r},0-${r+1},0` : `${r},${cols}-${r+1},${cols}`;
-                if(level.walls && (level.walls.includes(wallId) || level.walls.includes(wallId.split('-').reverse().join('-')))) return;
-                currentVal = calculateOp(op, new Fraction(level.initial)); path.push({r, c, val: currentVal}); updateDisplay(); return;
+                if(r === level.startPos.r && c === level.startPos.c) {
+                    path.push({r, c, val: currentVal}); 
+                    updateDisplay();
+                }
+                return;
             }
+            
             const last = path[path.length - 1]; if(last.r === r && last.c === c) return;
             if(path.length > 1 && path[path.length-2].r === r && path[path.length-2].c === c) { path.pop(); currentVal = path[path.length-1].val; updateDisplay(); return; }
-            const adj = (Math.abs(last.r - r) === 1 && last.c === c) || (Math.abs(last.c - c) === 1 && last.r === r);
-            if(!adj || path.some(p => p.r === r && p.c === c) || isWallBlocked(last.r, last.c, r, c, level.walls)) return;
+            if(Math.abs(last.r - r) + Math.abs(last.c - c) !== 1 || path.some(p => p.r === r && p.c === c) || isWallBlocked(last.r, last.c, r, c, level.walls)) return;
             currentVal = calculateOp(op, currentVal); path.push({r, c, val: currentVal}); updateDisplay();
         }
 
         function calculateOp(op, cur) {
-            if(op === 'e' || !op) return cur; const type = op[0], v = new Fraction(parseInt(op.substring(1)));
+            if(op === 'e') return cur; const type = op[0], v = new Fraction(parseInt(op.substring(1)));
             switch(type) { case '+': return cur.add(v); case '-': return cur.sub(v); case 'x': return cur.mul(v); case '/': return cur.div(v); } return cur;
         }
 
         function startDrag(e) { if(isCleared) return; isDragging = true; const t = e.touches ? e.touches[0] : e; handleMove(t.clientX, t.clientY); }
+        
         function endDrag() {
             if(!isDragging) return; isDragging = false;
-            const target = path.length > 0 ? document.querySelector(`.cell[data-r="${path[path.length-1].r}"][data-c="${path[path.length-1].c}"]`) : startNode;
-            if(target) snapPuckToTarget(target);
             const level = currentProblemList[currentProblemIndex];
+            // 最後にいたマスの位置にパックを吸着
+            const target = path.length > 0 ? document.querySelector(`.cell[data-r="${path[path.length-1].r}"][data-c="${path[path.length-1].c}"]`) : document.querySelector(`.cell[data-r="${level.startPos.r}"][data-c="${level.startPos.c}"]`);
+            if(target) snapPuckToTarget(target);
+            
             if(level && currentVal.equals(level.target)) {
                 isCleared = true; sessionStorage.setItem(`cleared_math_p${level.id}`, 'true');
                 document.getElementById('clear-overlay').style.display = 'block';
-                if(currentMode === 'score') { score += 10; document.getElementById('score-display').innerText = score; setTimeout(nextProblem, 1500); }
+                if(currentMode === 'score') { score += 10; setTimeout(nextProblem, 1500); }
                 else updateProblemSelector();
             }
         }
 
         function snapPuckToTarget(target) {
-            const rect = target.getBoundingClientRect(); if (rect.width === 0) return;
+            const rect = target.getBoundingClientRect();
             floatingPuck.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
             floatingPuck.style.left = (rect.left + rect.width/2) + 'px'; floatingPuck.style.top = (rect.top + rect.height/2) + 'px';
             setTimeout(() => floatingPuck.style.transition = '', 300);
