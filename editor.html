@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>この かずに しよう！ 編集エディタ v5.0</title>
+    <title>この かずに しよう！ 編集エディタ v5.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -31,7 +31,6 @@
         .cell.blocked { background: var(--cell-blocked); border-color: #334155; color: white; }
         .cell.blocked::after { content: "×"; opacity: 0.3; }
         
-        /* 修正：スタートマスのスタイル */
         .cell.is-start { border: 4px solid #3b82f6 !important; background: #dbeafe !important; }
         .cell.is-start::before { content: "🚩"; position: absolute; top: -10px; left: -10px; font-size: 1.2rem; z-index: 30; }
 
@@ -55,7 +54,7 @@
 <body class="flex flex-col">
 
     <header class="bg-white border-b flex items-center justify-between px-6 shadow-sm">
-        <h1 class="font-bold text-slate-700 flex items-center gap-2 text-lg">🧩 Pro Editor <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">v5.0</span></h1>
+        <h1 class="font-bold text-slate-700 flex items-center gap-2 text-lg">🧩 Pro Editor <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">v5.1</span></h1>
         <div class="flex gap-2">
             <button onclick="exportAllImagesZip()" class="text-xs bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition">🖼️ 全画像ZIP出力</button>
             <button onclick="importJSON()" class="text-xs bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold transition">読み込み</button>
@@ -65,8 +64,9 @@
 
     <main class="main-layout">
         <aside class="sidebar">
-            <div class="p-4 border-b flex-shrink-0">
+            <div class="p-4 border-b flex-shrink-0 space-y-2">
                 <button onclick="createNewProblem()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-blue-700 transition">＋ 新規作成</button>
+                <button onclick="sortProblemsByLevel()" class="w-full bg-slate-100 text-slate-600 py-2 rounded-xl font-bold text-[11px] border border-slate-200 hover:bg-slate-200 transition">📶 レベル順に並べ替え</button>
             </div>
             <div id="problem-list" class="problem-list-container"></div>
         </aside>
@@ -79,7 +79,13 @@
 
         <aside class="sidebar sidebar-right">
             <div class="p-6 overflow-y-auto h-full space-y-6">
-                <button onclick="saveActiveProblem()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black shadow-lg transition-transform active:scale-95">💾 変更を保存</button>
+                <div class="space-y-2">
+                    <button onclick="saveActiveProblem()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black shadow-lg transition-transform active:scale-95">💾 変更を保存</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="downloadSingleImage()" class="bg-white border-2 border-rose-200 text-rose-500 hover:bg-rose-50 py-2 rounded-xl font-bold text-xs transition">🖼️ 画像保存</button>
+                        <button onclick="resetCurrentGrid()" class="bg-white border-2 border-slate-200 text-slate-500 hover:bg-slate-50 py-2 rounded-xl font-bold text-xs transition">🧹 リセット</button>
+                    </div>
+                </div>
                 
                 <section class="space-y-4">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1">基本プロパティ</h3>
@@ -131,9 +137,6 @@
                         </div>
                         <input type="number" id="op-value" value="1" class="text-center font-black text-lg py-2">
                     </div>
-                    <button onclick="toggleOuterWalls()" class="w-full py-3 bg-slate-800 text-white text-[11px] font-bold rounded-xl hover:bg-black transition shadow-sm">
-                        外周の壁を一括 ON / OFF
-                    </button>
                 </section>
             </div>
         </aside>
@@ -168,7 +171,7 @@
                 id: 0, title: "新しい問題", level: 1, target: 10, initial: 1, 
                 grid: Array.from({length:3},()=>Array(3).fill('e')), 
                 walls: [],
-                startPos: {r:0, c:0} // 修正：デフォルト値
+                startPos: {r:0, c:0}
             });
             renumberIds(); selectProblem(problems.length - 1);
         }
@@ -178,6 +181,13 @@
             ['title', 'level', 'initial', 'target'].forEach(k => document.getElementById(`prop-${k}`).value = workingCopy[k]);
             document.getElementById('prop-size').value = `${workingCopy.grid.length}x${workingCopy.grid[0].length}`;
             refreshEditorUI(); updateProblemList();
+        }
+
+        function sortProblemsByLevel() {
+            problems.sort((a, b) => Number(a.level) - Number(b.level));
+            renumberIds();
+            selectProblem(0);
+            updateProblemList();
         }
 
         function handleDragStart(e, index) { dragSrcIndex = index; e.target.classList.add('dragging'); }
@@ -200,6 +210,92 @@
                 item.innerHTML = `<div class="text-xs font-black text-slate-800 flex justify-between"><span>${p.title}</span><span class="text-slate-300">#${p.id}</span></div><div class="text-[10px] text-slate-400 mt-1">Lv.${p.level} | ${p.grid[0].length}x${p.grid.length}</div>`;
                 container.appendChild(item);
             });
+        }
+
+        // --- 画像生成ヘルパー ---
+        async function captureProblemToCanvas(prob) {
+            const tempContainer = document.getElementById('export-temp-container');
+            tempContainer.innerHTML = `
+                <div id="capture-box" style="padding: 30px; background: white; width: fit-content; border: 2px solid #e2e8f0; border-radius: 20px;">
+                    <div style="margin-bottom: 20px; border-bottom: 4px solid #3b82f6; padding-bottom: 10px;">
+                        <div style="font-size: 14px; font-weight: bold; color: #64748b;">#${prob.id} (Lv.${prob.level})</div>
+                        <div style="font-size: 24px; font-weight: 900; color: #1e293b;">${prob.title}</div>
+                    </div>
+                    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                        <div style="flex: 1; background: #eff6ff; padding: 10px; border-radius: 12px; border: 2px solid #bfdbfe; text-align: center;">
+                            <div style="font-size: 10px; font-weight: bold; color: #3b82f6; text-transform: uppercase;">最初</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #1e40af;">${prob.initial}</div>
+                        </div>
+                        <div style="flex: 1; background: #fff1f2; padding: 10px; border-radius: 12px; border: 2px solid #fecdd3; text-align: center;">
+                            <div style="font-size: 10px; font-weight: bold; color: #e11d48; text-transform: uppercase;">目標</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #9f1239;">${prob.target}</div>
+                        </div>
+                    </div>
+                    <div id="temp-grid-wrapper" style="position: relative; background: #cbd5e1; padding: 40px; border-radius: 12px;"></div>
+                </div>`;
+            const wrapper = tempContainer.querySelector('#temp-grid-wrapper');
+            const rows = prob.grid.length, cols = prob.grid[0].length;
+            const gridRoot = document.createElement('div');
+            gridRoot.style.display = 'grid'; gridRoot.style.gap = '8px'; gridRoot.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const val = prob.grid[r][c];
+                    const cell = document.createElement('div');
+                    cell.style.width = '70px'; cell.style.height = '70px';
+                    const isS = (prob.startPos && prob.startPos.r === r && prob.startPos.c === c);
+                    cell.style.background = val === 'b' ? '#475569' : (isS ? '#dbeafe' : 'white');
+                    cell.style.border = isS ? '4px solid #3b82f6' : '1px solid #94a3b8';
+                    cell.style.borderRadius = '8px'; cell.style.display = 'flex'; cell.style.alignItems = 'center'; cell.style.justifyContent = 'center';
+                    cell.style.fontWeight = '900'; cell.style.fontSize = '1.2rem';
+                    cell.innerHTML = isS ? prob.initial : ((val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷'));
+                    gridRoot.appendChild(cell);
+                }
+            }
+            wrapper.appendChild(gridRoot);
+            const cellSize = 70, gap = 8, pad = 40;
+            for (const id of prob.walls) {
+                const pts = id.split('-').map(p => p.split(',').map(Number));
+                const isV = pts[0][1] === pts[1][1]; const r = pts[0][0], c = pts[0][1];
+                const w = document.createElement('div'); w.style.position = 'absolute'; w.style.background = '#ef4444'; w.style.borderRadius = '4px';
+                if(isV) { w.style.width='16px'; w.style.height='70px'; w.style.left=`${pad+(cellSize+gap)*c-(gap+16)/2+2}px`; w.style.top=`${pad+(cellSize+gap)*r}px`; }
+                else { w.style.width='70px'; w.style.height='16px'; w.style.left=`${pad+(cellSize+gap)*c}px`; w.style.top=`${pad+(cellSize+gap)*r-(gap+16)/2+2}px`; }
+                wrapper.appendChild(w);
+            }
+            return await html2canvas(tempContainer.querySelector('#capture-box'), { scale: 2 });
+        }
+
+        async function downloadSingleImage() {
+            if (activeIdx === -1) return;
+            ['title', 'level', 'initial', 'target'].forEach(k => workingCopy[k] = document.getElementById(`prop-${k}`).value);
+            const canvas = await captureProblemToCanvas(workingCopy);
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL("image/png");
+            link.download = `puzzle_${workingCopy.id}_${workingCopy.title}.png`;
+            link.click();
+            document.getElementById('export-temp-container').innerHTML = "";
+        }
+
+        async function exportAllImagesZip() {
+            if (problems.length === 0) return;
+            const zip = new JSZip();
+            if (!confirm(problems.length + "枚の問題をZIPにまとめて書き出します。")) return;
+            const btn = event.target; btn.innerText = "⏳ 処理中..."; btn.disabled = true;
+            try {
+                for (let i = 0; i < problems.length; i++) {
+                    const canvas = await captureProblemToCanvas(problems[i]);
+                    zip.file(`puzzle_${problems[i].id.toString().padStart(3, '0')}.png`, canvas.toDataURL("image/png").split(',')[1], {base64: true});
+                }
+                const content = await zip.generateAsync({type: "blob"});
+                const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "math_puzzle_images.zip"; link.click();
+            } catch (err) { alert("エラーが発生しました。"); } finally { document.getElementById('export-temp-container').innerHTML = ""; btn.innerText = "🖼️ 全画像ZIP出力"; btn.disabled = false; }
+        }
+
+        function resetCurrentGrid() {
+            if(!confirm("現在の盤面（マス目と壁）をすべてリセットしてもよろしいですか？")) return;
+            const rows = workingCopy.grid.length, cols = workingCopy.grid[0].length;
+            workingCopy.grid = Array.from({length: rows}, () => Array(cols).fill("e"));
+            workingCopy.walls = [];
+            refreshEditorUI();
         }
 
         // --- 編集ロジック ---
@@ -246,11 +342,8 @@
                 for (let c = 0; c < cols; c++) {
                     const val = workingCopy.grid[r][c];
                     const div = document.createElement('div');
-                    
-                    // 修正：スタートマスの強調表示
                     const isStart = (workingCopy.startPos && workingCopy.startPos.r === r && workingCopy.startPos.c === c);
                     div.className = `cell ${val === 'b' ? 'blocked' : ''} ${isStart ? 'is-start' : ''}`;
-                    
                     div.innerHTML = (val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷');
                     div.onmousedown = (e) => { e.preventDefault(); handleCellDown(r, c, div); };
                     div.onmouseenter = () => { if (isMouseDown) editCell(r, c); };
@@ -270,16 +363,6 @@
             };
             for (let r = 0; r < rows; r++) for (let c = 0; c <= cols; c++) createW(`${r},${c}-${r+1},${c}`, true, r, c);
             for (let r = 0; r <= rows; r++) for (let c = 0; c < cols; c++) createW(`${r},${c}-${r},${c+1}`, false, r, c);
-        }
-
-        function toggleOuterWalls() {
-            const rows = workingCopy.grid.length, cols = workingCopy.grid[0].length;
-            let outer = [];
-            for(let r=0; r<rows; r++) { outer.push(`${r},0-${r+1},0`); outer.push(`${r},${cols}-${r+1},${cols}`); }
-            for(let c=0; c<cols; c++) { outer.push(`0,${c}-0,${c+1}`); outer.push(`${rows},${c}-${rows},${c+1}`); }
-            if (outer.every(id => workingCopy.walls.includes(id))) workingCopy.walls = workingCopy.walls.filter(id => !outer.includes(id));
-            else outer.forEach(id => { if(!workingCopy.walls.includes(id)) workingCopy.walls.push(id); });
-            refreshEditorUI();
         }
 
         function resizeGrid() {
@@ -308,70 +391,6 @@
             problems.forEach(p => { if(!p.startPos) p.startPos = {r:0,c:0}; });
             renumberIds(); selectProblem(0); updateProblemList(); 
         }; reader.readAsText(file); }
-
-        // --- ZIP画像書き出し（startPos対応版） ---
-        async function exportAllImagesZip() {
-            if (problems.length === 0) return;
-            const zip = new JSZip();
-            const tempContainer = document.getElementById('export-temp-container');
-            if (!confirm(problems.length + "枚の問題をZIPにまとめて書き出します。")) return;
-            const btn = event.target; btn.innerText = "⏳ 処理中..."; btn.disabled = true;
-            try {
-                for (let i = 0; i < problems.length; i++) {
-                    const prob = problems[i];
-                    tempContainer.innerHTML = `
-                        <div id="capture-box" style="padding: 30px; background: white; width: fit-content; border: 2px solid #e2e8f0; border-radius: 20px;">
-                            <div style="margin-bottom: 20px; border-bottom: 4px solid #3b82f6; padding-bottom: 10px;">
-                                <div style="font-size: 14px; font-weight: bold; color: #64748b;">#${prob.id} (Lv.${prob.level})</div>
-                                <div style="font-size: 24px; font-weight: 900; color: #1e293b;">${prob.title}</div>
-                            </div>
-                            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-                                <div style="flex: 1; background: #eff6ff; padding: 10px; border-radius: 12px; border: 2px solid #bfdbfe; text-align: center;">
-                                    <div style="font-size: 10px; font-weight: bold; color: #3b82f6; text-transform: uppercase;">最初</div>
-                                    <div style="font-size: 24px; font-weight: 900; color: #1e40af;">${prob.initial}</div>
-                                </div>
-                                <div style="flex: 1; background: #fff1f2; padding: 10px; border-radius: 12px; border: 2px solid #fecdd3; text-align: center;">
-                                    <div style="font-size: 10px; font-weight: bold; color: #e11d48; text-transform: uppercase;">目標</div>
-                                    <div style="font-size: 24px; font-weight: 900; color: #9f1239;">${prob.target}</div>
-                                </div>
-                            </div>
-                            <div id="temp-grid-wrapper" style="position: relative; background: #cbd5e1; padding: 40px; border-radius: 12px;"></div>
-                        </div>`;
-                    const wrapper = tempContainer.querySelector('#temp-grid-wrapper');
-                    const rows = prob.grid.length, cols = prob.grid[0].length;
-                    const gridRoot = document.createElement('div');
-                    gridRoot.style.display = 'grid'; gridRoot.style.gap = '8px'; gridRoot.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
-                    for (let r = 0; r < rows; r++) {
-                        for (let c = 0; c < cols; c++) {
-                            const val = prob.grid[r][c];
-                            const cell = document.createElement('div');
-                            cell.style.width = '70px'; cell.style.height = '70px';
-                            const isS = (prob.startPos && prob.startPos.r === r && prob.startPos.c === c);
-                            cell.style.background = val === 'b' ? '#475569' : (isS ? '#dbeafe' : 'white');
-                            cell.style.border = isS ? '4px solid #3b82f6' : '1px solid #94a3b8';
-                            cell.style.borderRadius = '8px'; cell.style.display = 'flex'; cell.style.alignItems = 'center'; cell.style.justifyContent = 'center';
-                            cell.style.fontWeight = '900'; cell.style.fontSize = '1.2rem';
-                            cell.innerHTML = isS ? prob.initial : ((val === 'e' || val === 'b') ? '' : val.replace('x','×').replace('/','÷'));
-                            gridRoot.appendChild(cell);
-                        }
-                    }
-                    wrapper.appendChild(gridRoot);
-                    const cellSize = 70, gap = 8, pad = 40;
-                    for (const id of prob.walls) {
-                        const pts = id.split('-').map(p => p.split(',').map(Number));
-                        const isV = pts[0][1] === pts[1][1]; const r = pts[0][0], c = pts[0][1];
-                        const w = document.createElement('div'); w.style.position = 'absolute'; w.style.background = '#ef4444'; w.style.borderRadius = '4px';
-                        if(isV) { w.style.width='16px'; w.style.height='70px'; w.style.left=`${pad+(cellSize+gap)*c-(gap+16)/2+2}px`; w.style.top=`${pad+(cellSize+gap)*r}px`; }
-                        else { w.style.width='70px'; w.style.height='16px'; w.style.left=`${pad+(cellSize+gap)*c}px`; w.style.top=`${pad+(cellSize+gap)*r-(gap+16)/2+2}px`; }
-                        wrapper.appendChild(w);
-                    }
-                    const canvas = await html2canvas(tempContainer.querySelector('#capture-box'), { scale: 2 });
-                    zip.file(`puzzle_${prob.id.toString().padStart(3, '0')}.png`, canvas.toDataURL("image/png").split(',')[1], {base64: true});
-                }
-                const content = await zip.generateAsync({type: "blob"});
-                const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "math_puzzle_images.zip"; link.click();
-            } catch (err) { alert("エラーが発生しました。"); } finally { tempContainer.innerHTML = ""; btn.innerText = "🖼️ 全画像ZIP出力"; btn.disabled = false; }
-        }
     </script>
 </body>
 </html>
